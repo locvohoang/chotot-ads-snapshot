@@ -95,6 +95,10 @@
     <div id="presetButtons" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
   </div>
   <div class="field">
+    <label>Vertical (account)</label>
+    <div id="verticalChecks" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+  </div>
+  <div class="field">
     <label>Tìm campaign/ad</label>
     <input type="text" id="searchBox" placeholder="Nhập tên...">
   </div>
@@ -115,6 +119,7 @@ const ACCOUNT_ORDER = ["pty", "job", "gds", "veh"];
 let currentPlatform = 'campaign';
 let currentPreset = 'ytd'; // chỉ áp dụng cho tab Campaign — 'ytd' | 'this_month' | 'last_month' | 'this_week' | 'last_week'
 let searchTerm = '';
+let selectedAccounts = new Set(ACCOUNT_ORDER); // vertical (account) filter — mặc định chọn hết
 
 // Nguồn data cho tab Campaign theo preset đang chọn. YTD = DASH (bộ số gốc từ đầu năm).
 // Các preset khác lấy từ PRESETS_DATA (pull riêng cho từng khoảng ngày cố định — xem ghi chú trong banner).
@@ -127,6 +132,18 @@ function renderPresetButtons(){
   el.innerHTML = PRESET_ORDER.map(p => `<button type="button" class="preset-btn${p===currentPreset?' active':''}" data-preset="${p}">${PRESET_LABELS[p]}</button>`).join('');
   el.querySelectorAll('.preset-btn').forEach(b => {
     b.addEventListener('click', () => { currentPreset = b.getAttribute('data-preset'); render(); });
+  });
+}
+
+function renderVerticalChecks(){
+  const el = document.getElementById('verticalChecks');
+  el.innerHTML = ACCOUNT_ORDER.map(k => `<label style="display:flex; align-items:center; gap:4px; font-size:12.5px; font-weight:500;"><input type="checkbox" data-acc="${k}" ${selectedAccounts.has(k)?'checked':''}> ${escapeHtml(DASH[k].label)}</label>`).join('');
+  el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const k = e.target.getAttribute('data-acc');
+      if (e.target.checked) selectedAccounts.add(k); else selectedAccounts.delete(k);
+      render();
+    });
   });
 }
 
@@ -155,6 +172,7 @@ function renderSummary(){
   let spend=0, reach=0, impr=0, buzz=0, eng=0, count=0;
   const summarySource = currentPlatform === 'campaign' ? getCampaignAccounts() : DASH;
   ACCOUNT_ORDER.forEach(k => {
+    if (!selectedAccounts.has(k)) return;
     const acc = summarySource[k];
     const list = currentPlatform === 'campaign' ? acc.campaigns : acc.ads;
     list.forEach(r => {
@@ -209,7 +227,12 @@ function renderAccountsForPlatform(){
   }
   let html = '';
   const campaignSource = getCampaignAccounts();
-  ACCOUNT_ORDER.forEach(k => {
+  const visibleAccounts = ACCOUNT_ORDER.filter(k => selectedAccounts.has(k));
+  if (!visibleAccounts.length){
+    container.innerHTML = `<div class="account-block"><div style="padding:16px; color:#6b7280; font-size:12.5px; text-align:center;">Chưa chọn vertical nào — tick ít nhất 1 account ở bộ lọc phía trên.</div></div>`;
+    return;
+  }
+  visibleAccounts.forEach(k => {
     const acc = currentPlatform === 'campaign' ? campaignSource[k] : DASH[k];
     const cur = acc.currency;
     if (currentPlatform === 'campaign'){
@@ -293,6 +316,7 @@ function render(){
   document.getElementById('presetField').style.display = currentPlatform === 'campaign' ? '' : 'none';
   document.querySelectorAll('.ptab-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-p') === currentPlatform));
   renderPresetButtons();
+  renderVerticalChecks();
   renderSummary();
   if (currentPlatform === 'recommendation'){ renderRecommendation(); }
   else { renderAccountsForPlatform(); }
